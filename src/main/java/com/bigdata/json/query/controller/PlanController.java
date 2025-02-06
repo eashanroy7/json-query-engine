@@ -52,7 +52,7 @@ public class PlanController {
                         .body("JSON Schema validation failed: " + validationErrors);
             }
 
-            // We assume top-level "objectId" is mandatory.
+            // Assuming top-level "objectId" is mandatory.
             // We have to ensure it is in the JSON per schema
             String objectId = jsonNode.get("objectId").asText();
             if (objectId == null || objectId.isBlank()) {
