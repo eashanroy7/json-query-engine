@@ -4,9 +4,11 @@
   "title": "Plan",
   "description": "JSON schema for plan data",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "planCostShares": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "deductible": { "type": "number" },
         "_org":       { "type": "string" },
@@ -20,9 +22,11 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "properties": {
           "linkedService": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
               "_org":       { "type": "string" },
               "objectId":   { "type": "string" },
@@ -33,6 +37,7 @@
           },
           "planserviceCostShares": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
               "deductible": { "type": "number" },
               "_org":       { "type": "string" },
