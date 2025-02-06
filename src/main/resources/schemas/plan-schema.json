@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://example.com/plan-schema.json",
+  "title": "Plan",
+  "description": "JSON schema for plan data",
+  "type": "object",
+  "properties": {
+    "planCostShares": {
+      "type": "object",
+      "properties": {
+        "deductible": { "type": "number" },
+        "_org":       { "type": "string" },
+        "copay":      { "type": "number" },
+        "objectId":   { "type": "string" },
+        "objectType": { "type": "string" }
+      },
+      "required": ["deductible", "copay", "objectId", "objectType"]
+    },
+    "linkedPlanServices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "linkedService": {
+            "type": "object",
+            "properties": {
+              "_org":       { "type": "string" },
+              "objectId":   { "type": "string" },
+              "objectType": { "type": "string" },
+              "name":       { "type": "string" }
+            },
+            "required": ["objectId", "objectType", "name"]
+          },
+          "planserviceCostShares": {
+            "type": "object",
+            "properties": {
+              "deductible": { "type": "number" },
+              "_org":       { "type": "string" },
+              "copay":      { "type": "number" },
+              "objectId":   { "type": "string" },
+              "objectType": { "type": "string" }
+            },
+            "required": ["deductible", "copay", "objectId", "objectType"]
+          },
+          "_org":       { "type": "string" },
+          "objectId":   { "type": "string" },
+          "objectType": { "type": "string" }
+        },
+        "required": ["linkedService", "planserviceCostShares", "objectId", "objectType"]
+      }
+    },
+    "_org":       { "type": "string" },
+    "objectId":   { "type": "string" },
+    "objectType": { "type": "string" },
+    "planType":   { "type": "string" },
+    "creationDate": { "type": "string" }
+  },
+  "required": ["planCostShares", "linkedPlanServices", "objectId", "objectType", "planType"]
+}
