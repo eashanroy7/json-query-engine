@@ -58,7 +58,10 @@
     "objectId":   { "type": "string" },
     "objectType": { "type": "string" },
     "planType":   { "type": "string" },
-    "creationDate": { "type": "string" }
+    "creationDate": {
+      "type": "string",
+      "pattern": "^(\\d{4}-(0[13578]|1[02])-31|\\d{4}-(0[13-9]|1[0-2])-(0[1-9]|[12]\\d|30)|\\d{4}-02-(0[1-9]|1\\d|2[0-9])|(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])-\\d{4}|(0[1-9]|[12]\\d|3[01])-(0[1-9]|1[0-2])-\\d{4})$"
+    }
   },
   "required": ["planCostShares", "linkedPlanServices", "objectId", "objectType", "planType"]
 }
