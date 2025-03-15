@@ -1,23 +1,45 @@
 # **JSON Query Engine**
 
-A REST API built with **Spring Boot** and **Redis** to handle structured JSON data. The application supports **CRUD operations**, **JSON Schema validation**, **ETag-based conditional reads**, and stores data in a **key-value store** (Redis).
+A REST API built with **Spring Boot** and **Redis** to handle structured JSON data. The application supports **CRUD operations**, **JSON Schema validation**, **ETag-based conditional read/writes**, **JSON Merge Patch for partial updates**, and and security via **Google OAuth 2.0** with RS256.
 
 ---
 
 ## **Features**
 - **CRUD Operations**:
-    - Create (`POST /api/plans`)
-    - Read (`GET /api/plans/{objectId}`)
-    - Delete (`DELETE /api/plans/{objectId}`)
+    - **Create (POST /api/plans):**  
+      Creates a new plan resource.
+      - If a plan with the same `objectId` does not exist, it creates the resource (returns **201 Created**).
+      - If a plan with the same `objectId` exists and the incoming JSON is identical (ETag match), returns **304 Not Modified**.
+      - If a plan with the same `objectId` exists but with different content, it overwrites the resource and returns **201 Created**.
 
-- **Validation**:  
-  Validates incoming JSON payloads against a pre-defined **JSON Schema** (`plan-schema.json`).
+    - **Read (GET /api/plans/{objectId}):**  
+          Retrieves a plan by its `objectId` with conditional read support using ETag/If-None-Match.
 
-- **ETag Support**:  
-  The API generates an **ETag** based on the JSON payload and uses it for **conditional reads** to optimize caching and concurrency.
+    - **Read All (GET /api/plans):**  
+      - Returns a list of all stored plans.
 
-- **Data Storage**:  
-  Stores and retrieves data from **Redis** as a key-value store, using the `objectId` as the key.
+    - **Delete (DELETE /api/plans/{objectId}):**  
+      - Deletes a plan resource by its `objectId`.
+
+    - **Update (PATCH /api/plans/{objectId}):**  
+      Supports JSON Merge Patch for partial updates with conditional write using the `If-Match` header.
+        - If the PATCH payload makes no effective change (ETag remains the same), returns **304 Not Modified**.
+
+- **Validation:**
+    - All incoming JSON payloads are validated against a pre-defined JSON Schema (`plan-schema.json`).
+
+- **ETag Support:**
+    - ETags are computed on the fly (using an MD5 hash of the JSON content) to support conditional reads and writes.
+    - GET requests use `If-None-Match` for caching (returning 304 Not Modified if the ETag matches).
+    - PATCH requests require an `If-Match` header (returning 412 Precondition Failed if it does not match).
+
+- **Data Storage:**
+    - Uses Redis as a key-value store.
+    - Each plan is stored as a Redis hash with the key pattern `plan:data:{objectId}` and a single field `"json"` containing the plan’s JSON.
+
+- **Security (Google OAuth 2.0):**
+    - All endpoints are secured using Bearer tokens issued by Google.
+    - The API uses Spring Security’s OAuth2 Resource Server to validate JWT tokens (signed with RS256).
 
 ---
 
@@ -25,7 +47,7 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 
 ### 1. **POST `/api/plans`**
 - **Description:** Create a new plan and store it in Redis.
-- **Request Body:**
+- **Request Body Example:**
   ```json
   {
     "planCostShares": {
@@ -62,10 +84,13 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
     "creationDate": "12-12-2017"
   }
   ```
-- **Response:** `201 Created`
-    - Headers:
-        - `Location`: `/api/plans/12xvxc345ssdsds-508`
-        - `ETag`: `<generated-etag>`
+- **Response:**
+  - **201 Created:** Resource created or overwritten.
+  - **304 Not Modified:** If the resource already exists with identical content.
+
+**Headers:**
+        - `Location`: `/api/plans/{objectId}`
+        - `ETag`: `<computed-etag>`
 
 ---
 
@@ -80,7 +105,32 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 
 ---
 
-### 3. **DELETE `/api/plans/{objectId}`**
+### 2. **GET /api/plans**
+**Description:**  
+Retrieves all stored plans.
+
+**Response:**
+- **200 OK:** Returns a JSON array of plans.
+
+---
+
+### 3. **PATCH /api/plans/{objectId}**
+**Description:**  
+Applies a **JSON Merge Patch (RFC 7386)** to update a plan.
+
+**Conditional Write:**
+- Requires an `If-Match` header that must match the computed ETag.
+- If the patch makes no effective change, returns **304 Not Modified**.
+- For the `linkedPlanServices` array, if an element with a new `objectId` is provided, the new object is appended.
+
+**Response:**
+- **200 OK:** Returns the updated JSON and new ETag.
+- **304 Not Modified:** If no effective change is made.
+- **412 Precondition Failed:** If the `If-Match` header does not match.
+
+---
+
+### 4. **DELETE `/api/plans/{objectId}`**
 - **Description:** Delete the plan by `objectId`.
 - **Response:**
     - `204 No Content` if the object was deleted successfully.
@@ -94,6 +144,7 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 - Java 17+
 - Maven
 - Redis (either installed locally or running in Docker)
+- Google Cloud Account for OAuth 2.0 credentials
 
 ### **Running the Application**
 
@@ -113,14 +164,21 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
    cd json-query-engine
    ```
 
-3**Build and run the application**:
+3. **Build and run the application**:
    ```bash
    ./mvnw spring-boot:run
    ```
-4**Access the API**:
+4. **Access the API**:
    ```bash
    Base URL: http://localhost:8081
    ```
+
+## **Configure Google OAuth 2.0**
+1. Create OAuth 2.0 credentials in Google Cloud.
+2. Configure your OAuth Client (e.g., use https://oauth.pstmn.io/v1/callback for Postman).
+3. Use the Client ID and Client Secret to obtain a Bearer token.
+4. Ensure your API’s security configuration is set to validate Google’s JWT tokens.
+
 
 ## **Configuration**
 
@@ -130,11 +188,24 @@ Modify the following properties in `src/main/resources/application.properties` i
 server.port=8081
 spring.redis.host=localhost
 spring.redis.port=6379
+
+# OAuth2 Resource Server configuration
+spring.security.oauth2.resourceserver.jwt.issuer-uri=https://accounts.google.com
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://www.googleapis.com/oauth2/v3/certs
 ```
 
 ## **Testing**
 
-### **Example Requests**
+### **Example Requests (using Postman)**
+
+### **Authentication**
+Obtain a Bearer token from Google using OAuth 2.0.
+
+Set the header:
+Authorization: Bearer <token>
+```
+Authorization: Bearer <token>
+```
 
 #### **POST** `/api/plans`
 - **Request Body**:
@@ -158,6 +229,12 @@ spring.redis.port=6379
     "creationDate": "12-12-2017"
   }
   ```
+- **Expected Behavior**:
+
+  - If the plan does not exist: 201 Created.
+  - If the plan exists and the content is identical: 304 Not Modified.
+  - If the plan exists and the content differs: Overwrite and return 201 Created.
+
 
 #### **GET** with ETag:
 - **Request Header**:

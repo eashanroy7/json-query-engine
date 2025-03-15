@@ -13,6 +13,7 @@ import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.InputStream;
+import java.util.List;
 import java.util.Set;
 
 @RestController
@@ -37,6 +38,9 @@ public class PlanController {
 
     /**
      * CREATE a Plan (POST /api/plans)
+     * If the same objectId + same JSON already exists, return 304 Not Modified.
+     * If the same objectId but different JSON, return  201 Created.
+     * Otherwise, create new plan with 201 Created.
      */
     @PostMapping
     public ResponseEntity<?> createPlan(@RequestBody String jsonPayload) {
@@ -60,20 +64,35 @@ public class PlanController {
                         .body("objectId is missing or empty in JSON");
             }
 
-            // Convert the entire JSON into a hashed ETag (e.g., MD5)
-            String etag = generateEtag(jsonPayload);
+            // Compute ETag for the incoming JSON payload
+            String incomingEtag = generateEtag(jsonPayload);
 
-            // Save to Redis
-            planService.savePlan(objectId, jsonPayload, etag);
-
-            // Return 201 Created with Location and ETag
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .header("Location", "/api/plans/" + objectId)
-                    .eTag(etag)
-                    .build();
-
+            // Check if a plan with the given objectId already exists
+            String existingJson = planService.getPlan(objectId);
+            if (existingJson == null) {
+                // No existing resource: create new and return 201 Created
+                planService.savePlan(objectId, jsonPayload);
+                return ResponseEntity.status(HttpStatus.CREATED)
+                        .header("Location", "/api/plans/" + objectId)
+                        .eTag(incomingEtag)
+                        .build();
+            } else {
+                // Resource exists: compute its ETag on the fly
+                String storedEtag = generateEtag(existingJson);
+                if (incomingEtag.equals(storedEtag)) {
+                    // Same content: return 304 Not Modified
+                    return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                            .body("Plan already exists with the same content.");
+                } else {
+                    // Different content: overwrite the existing resource
+                    planService.savePlan(objectId, jsonPayload);
+                    return ResponseEntity.status(HttpStatus.CREATED)
+                            .header("Location", "/api/plans/" + objectId)
+                            .eTag(incomingEtag)
+                            .body("Plan updated with new content.");
+                }
+            }
         } catch (Exception e) {
-            // Could be parsing or other errors
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Invalid JSON: " + e.getMessage());
         }
@@ -95,8 +114,8 @@ public class PlanController {
                     .body("No plan found with objectId = " + objectId);
         }
 
-        // Retrieve the stored ETag
-        String currentEtag = planService.getEtag(objectId);
+        // Compute the ETag from the stored JSON
+        String currentEtag = generateEtag(planJson);
 
         // If the client sends If-None-Match = currentEtag, respond 304
         if (ifNoneMatch != null && ifNoneMatch.equals(currentEtag)) {
@@ -107,6 +126,58 @@ public class PlanController {
         return ResponseEntity.ok()
                 .eTag(currentEtag)
                 .body(planJson);
+    }
+
+    /**
+     * GET all Plans (GET /api/plans)
+     */
+    @GetMapping
+    public ResponseEntity<?> getAllPlans() {
+        List<String> plans = planService.getAllPlans();
+        return ResponseEntity.ok(plans);
+    }
+
+    /**
+     * PATCH a Plan (PATCH /api/plans/{objectId})
+     * Allows partial updates via JSON merge patch.
+     * Requires If-Match header for conditional update.
+     */
+    @PatchMapping("/{objectId}")
+    public ResponseEntity<?> patchPlan(
+            @PathVariable String objectId,
+            @RequestHeader(value = "If-Match", required = false) String ifMatch,
+            @RequestBody String patchPayload) {
+
+        try {
+            String existingJson = planService.getPlan(objectId);
+            if (existingJson == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("No plan found with objectId = " + objectId);
+            }
+            // ETag check
+            String currentEtag = generateEtag(existingJson);
+            if (ifMatch == null || !ifMatch.equals(currentEtag)) {
+                return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED)
+                        .body("ETag mismatch: resource has been modified");
+            }
+            // Apply Patch
+            String updatedJson = planService.patchPlan(objectId, patchPayload);
+            JsonNode mergedNode = objectMapper.readTree(updatedJson);
+            Set<ValidationMessage> validationErrors = schema.validate(mergedNode);
+            if (!validationErrors.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body("JSON Schema validation failed after patch: " + validationErrors);
+            }
+            // Check if content is actually changed after patch
+            String newEtag = generateEtag(updatedJson);
+            if(newEtag.equals(currentEtag)){
+                return ResponseEntity.status(HttpStatus.NOT_MODIFIED).build();
+            }
+            return ResponseEntity.ok().eTag(newEtag).body(updatedJson);
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Failed to apply patch: " + ex.getMessage());
+        }
     }
 
     /**
