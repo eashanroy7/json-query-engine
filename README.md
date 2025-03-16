@@ -99,18 +99,17 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 - **Headers:**
     - `If-None-Match`: `<etag>` (optional)
 - **Response:**
-    - `200 OK` with JSON body if the resource exists and is not modified.
+    - `200 OK` with JSON body if the resource exists and ETag doesn't match/not provided.
     - `304 Not Modified` if the `If-None-Match` header matches the current ETag.
     - `404 Not Found` if the resource does not exist.
 
 ---
 
 ### 2. **GET /api/plans**
-**Description:**  
-Retrieves all stored plans.
+- **Description:** Retrieves all stored plans.
 
-**Response:**
-- **200 OK:** Returns a JSON array of plans.
+- **Response:**
+    - `200 OK` with a JSON array of plans.
 
 ---
 
