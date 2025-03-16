@@ -99,34 +99,33 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 - **Headers:**
     - `If-None-Match`: `<etag>` (optional)
 - **Response:**
-    - `200 OK` with JSON body if the resource exists and is not modified.
+    - `200 OK` with JSON body if the resource exists and ETag doesn't match/not provided.
     - `304 Not Modified` if the `If-None-Match` header matches the current ETag.
     - `404 Not Found` if the resource does not exist.
 
 ---
 
 ### 2. **GET /api/plans**
-**Description:**  
-Retrieves all stored plans.
+- **Description:** Retrieves all stored plans.
 
-**Response:**
-- **200 OK:** Returns a JSON array of plans.
+- **Response:**
+    - `200 OK` with a JSON array of plans.
+    - `404 Not Found` if resource does not exist.
 
 ---
 
 ### 3. **PATCH /api/plans/{objectId}**
-**Description:**  
-Applies a **JSON Merge Patch (RFC 7386)** to update a plan.
+- **Description:** Applies a **JSON Merge Patch (RFC 7386)** to update a plan.
 
-**Conditional Write:**
-- Requires an `If-Match` header that must match the computed ETag.
-- If the patch makes no effective change, returns **304 Not Modified**.
-- For the `linkedPlanServices` array, if an element with a new `objectId` is provided, the new object is appended.
+- **Conditional Write:**
+    - Requires an `If-Match` header that must match the computed ETag. If it doesn't match, returns **412 Precondition Failed**
+    - If the patch makes no effective change, returns **304 Not Modified**.
+    - If element with new `objectId` is provided in the patch payload, a new object is created and appended.
 
-**Response:**
-- **200 OK:** Returns the updated JSON and new ETag.
-- **304 Not Modified:** If no effective change is made.
-- **412 Precondition Failed:** If the `If-Match` header does not match.
+- **Response:**
+    - `200 OK`: Returns the updated JSON and new ETag.
+    - `304 Not Modified`: If no effective change is made.
+    - `412 Precondition Failed:` If the `If-Match` header does not match.
 
 ---
 
@@ -149,11 +148,11 @@ Applies a **JSON Merge Patch (RFC 7386)** to update a plan.
 ### **Running the Application**
 
 1. **Start Redis**:
-    - Locally:
+   Locally:
       ```bash
       redis-server
       ```
-    - Docker:
+   Docker:
       ```bash
       docker run --name redis -p 6379:6379 -d redis
       ```
@@ -167,22 +166,18 @@ Applies a **JSON Merge Patch (RFC 7386)** to update a plan.
 3. **Build and run the application**:
    ```bash
    ./mvnw spring-boot:run
-   ```
-4. **Access the API**:
-   ```bash
-   Base URL: http://localhost:8081
+   /* The API will start on port 8081 */
    ```
 
-## **Configure Google OAuth 2.0**
-1. Create OAuth 2.0 credentials in Google Cloud.
-2. Configure your OAuth Client (e.g., use https://oauth.pstmn.io/v1/callback for Postman).
-3. Use the Client ID and Client Secret to obtain a Bearer token.
-4. Ensure your API’s security configuration is set to validate Google’s JWT tokens.
-
+4. **Configure Google OAuth 2.0**:
+    - Create OAuth 2.0 credentials in Google Cloud.
+    - Configure your OAuth Client (for example, use https://oauth.pstmn.io/v1/callback for Postman).
+    - Use the Client ID and Client Secret to obtain a Bearer token.
+    - Ensure your API’s security configuration is set to validate Google’s JWT tokens.
 
 ## **Configuration**
 
-Modify the following properties in `src/main/resources/application.properties` if needed:
+Edit the following properties in `src/main/resources/application.properties` if needed:
 
 ```properties
 server.port=8081
@@ -193,75 +188,22 @@ spring.redis.port=6379
 spring.security.oauth2.resourceserver.jwt.issuer-uri=https://accounts.google.com
 spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://www.googleapis.com/oauth2/v3/certs
 ```
-
-## **Testing**
-
-### **Example Requests (using Postman)**
-
-### **Authentication**
-Obtain a Bearer token from Google using OAuth 2.0.
-
-Set the header:
-Authorization: Bearer <token>
-```
-Authorization: Bearer <token>
-```
-
-#### **POST** `/api/plans`
-- **Request Body**:
-  ```json
-  {
-    "objectId": "12xvxc345ssdsds-508",
-    "objectType": "plan",
-    "planType": "inNetwork",
-    "creationDate": "12-12-2017"
-  }
-  ```
-- **Response:**: `201 Created`
-
-#### **GET** `/api/plans/12xvxc345ssdsds-508`
-- **Response**: `200 OK`
-  ```json
-  {
-    "objectId": "12xvxc345ssdsds-508",
-    "objectType": "plan",
-    "planType": "inNetwork",
-    "creationDate": "12-12-2017"
-  }
-  ```
-- **Expected Behavior**:
-
-  - If the plan does not exist: 201 Created.
-  - If the plan exists and the content is identical: 304 Not Modified.
-  - If the plan exists and the content differs: Overwrite and return 201 Created.
-
-
-#### **GET** with ETag:
-- **Request Header**:
-  ```http
-  If-None-Match: "<etag>"
-  ```
-- **Response**: `304 Not Modified`
-
-#### **DELETE** `/api/plans/12xvxc345ssdsds-508`
-- **Response**: `204 No Content`
-
----
-
-## **Schema Validation**
-
-The API validates incoming JSON payloads using the **JSON Schema** defined in `src/main/resources/schemas/plan-schema.json`. If validation fails, the API returns a `400 Bad Request` with details about the errors.
-
----
+## **Testing in Postman**
+![Configure Auth in Postman](docs/images/Configure%20Parent%20Auth%20in%20Postman.png)
+![Configure Auth in Postman](docs/images/Requesting%20new%20Google%20IDP%20token.png)
+![Postman Request New Token](docs/images/Select%20gmail%20id.jpg)
+![Postman Request New Token](docs/images/Consent%20screen%20to%20grant%20access%20to%20Postman.jpg)
+![Inherit Auth from Parent](docs/images/Inherit%20Auth%20from%20Parent.png)
 
 ## **Troubleshooting**
 
-### **Common Errors**
 1. **Port already in use**:  
    Update the port in `application.properties` or free the port.
 
 2. **Redis connection errors**:  
    Ensure Redis is running and accessible at `localhost:6379`.
+3. **OAuth 2.0 Errors:**:
+   Verify that the Bearer token is valid and that the security configuration is correctly set up.
 
 ---
 
@@ -270,15 +212,8 @@ The API validates incoming JSON payloads using the **JSON Schema** defined in `s
 - **Spring Boot** (REST API framework)
 - **Redis** (Key-value store)
 - **JSON Schema Validator (NetworkNT)** (for payload validation)
+- **Spring Security: OAuth2 Resource Server (with Google IDP using RS256)**
 - **Maven** (Build tool)
-
----
-
-## **Future Enhancements**
-
-- Add support for **PUT (update)** requests.
-- Implement more complex **querying capabilities** for JSON data.
-- Add **authentication and authorization**.
 
 ---
 
