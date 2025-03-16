@@ -110,22 +110,22 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 
 - **Response:**
     - `200 OK` with a JSON array of plans.
+    - `404 Not Found` if resource does not exist.
 
 ---
 
 ### 3. **PATCH /api/plans/{objectId}**
-**Description:**  
-Applies a **JSON Merge Patch (RFC 7386)** to update a plan.
+- **Description:** Applies a **JSON Merge Patch (RFC 7386)** to update a plan.
 
-**Conditional Write:**
-- Requires an `If-Match` header that must match the computed ETag.
-- If the patch makes no effective change, returns **304 Not Modified**.
-- For the `linkedPlanServices` array, if an element with a new `objectId` is provided, the new object is appended.
+- **Conditional Write:**
+    - Requires an `If-Match` header that must match the computed ETag. If it doesn't match, returns **412 Precondition Failed**
+    - If the patch makes no effective change, returns **304 Not Modified**.
+    - If element with new `objectId` is provided in the patch payload, a new object is created and appended.
 
-**Response:**
-- **200 OK:** Returns the updated JSON and new ETag.
-- **304 Not Modified:** If no effective change is made.
-- **412 Precondition Failed:** If the `If-Match` header does not match.
+- **Response:**
+    - `200 OK`: Returns the updated JSON and new ETag.
+    - `304 Not Modified`: If no effective change is made.
+    - `412 Precondition Failed:` If the `If-Match` header does not match.
 
 ---
 
