@@ -105,7 +105,7 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 
 ---
 
-### 3. **GET `/api/plans*`**
+### 3. **GET `/api/plans`**
 - **Description:** Retrieves all stored plans.
 
 - **Response:**
