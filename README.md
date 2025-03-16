@@ -189,10 +189,37 @@ spring.security.oauth2.resourceserver.jwt.issuer-uri=https://accounts.google.com
 spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://www.googleapis.com/oauth2/v3/certs
 ```
 ## **Testing in Postman**
+
+When testing with Postman, you need to configure **OAuth 2.0** to obtain a valid Google-signed JWT token, then set your requests to **inherit** that authentication.
+
+---
+
+### **1. Configure Parent Auth in Postman**
+This screenshot shows how to set up OAuth 2.0 at the **Collection level**, so individual requests can inherit it.
 ![Configure Auth in Postman](docs/images/Configure%20Parent%20Auth%20in%20Postman.png)
-![Configure Auth in Postman](docs/images/Requesting%20new%20Google%20IDP%20token.png)
-![Postman Request New Token](docs/images/Select%20gmail%20id.jpg)
-![Postman Request New Token](docs/images/Consent%20screen%20to%20grant%20access%20to%20Postman.jpg)
+
+---
+
+### **2. Requesting a New Google IDP Token**
+After setting up OAuth 2.0, click **"Get New Access Token"** to start the Google login flow.
+![Requesting new Google IDP token](docs/images/Requesting%20new%20Google%20IDP%20token.png)
+
+---
+
+### **3. Selecting Your Gmail Account**
+Here, Postman prompts you to select the Google account for which you want to grant access.
+![Select Gmail ID](docs/images/Select%20gmail%20id.jpg)
+
+---
+
+### **4. Consent Screen to Grant Access**
+Google shows a consent screen asking you to allow Postman to access your profile and email.
+![Consent screen to grant access to Postman](docs/images/Consent%20screen%20to%20grant%20access%20to%20Postman.jpg)
+
+---
+
+### **5. Inherit Auth from Parent**
+Finally, each request can inherit the OAuth 2.0 configuration from the parent collection, making it easier to manage tokens.
 ![Inherit Auth from Parent](docs/images/Inherit%20Auth%20from%20Parent.png)
 
 ## **Troubleshooting**
@@ -202,7 +229,7 @@ spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://www.googleapis.com
 
 2. **Redis connection errors**:  
    Ensure Redis is running and accessible at `localhost:6379`.
-3. **OAuth 2.0 Errors:**:
+3. **OAuth 2.0 Errors**:
    Verify that the Bearer token is valid and that the security configuration is correctly set up.
 
 ---
