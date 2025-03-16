@@ -1,6 +1,6 @@
 # **JSON Query Engine**
 
-A REST API built with **Spring Boot** and **Redis** to handle structured JSON data. The application supports **CRUD operations**, **JSON Schema validation**, **ETag-based conditional read/writes**, **JSON Merge Patch for partial updates**, and and security via **Google OAuth 2.0** with RS256.
+A REST API built with **Spring Boot** and **Redis** to handle structured JSON data. The application supports **CRUD operations**, **JSON Schema validation**, **ETag-based conditional read/writes**, **JSON Merge Patch for partial updates**, and security via **Google OAuth 2.0** with RS256.
 
 ---
 
@@ -18,12 +18,13 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
     - **Read All (GET /api/plans):**  
       - Returns a list of all stored plans.
 
-    - **Delete (DELETE /api/plans/{objectId}):**  
-      - Deletes a plan resource by its `objectId`.
-
     - **Update (PATCH /api/plans/{objectId}):**  
       Supports JSON Merge Patch for partial updates with conditional write using the `If-Match` header.
-        - If the PATCH payload makes no effective change (ETag remains the same), returns **304 Not Modified**.
+      - If the request header doesn't contain the `If-Match` header, or if the ETag value is not the latest one, returns **412 Precondition Failed**. 
+      - If the PATCH payload makes no effective change (ETag remains the same), returns **304 Not Modified**.
+
+    - **Delete (DELETE /api/plans/{objectId}):**  
+      - Deletes a plan resource by its `objectId`.
 
 - **Validation:**
     - All incoming JSON payloads are validated against a pre-defined JSON Schema (`plan-schema.json`).
@@ -86,11 +87,10 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
   ```
 - **Response:**
   - **201 Created:** Resource created or overwritten.
-  - **304 Not Modified:** If the resource already exists with identical content.
-
-**Headers:**
-        - `Location`: `/api/plans/{objectId}`
-        - `ETag`: `<computed-etag>`
+  - **304 Not Modified:** If the resource already exists with identical content.  
+  **Headers:**
+    - `Location`: `/api/plans/{objectId}`
+    - `ETag`: `<computed-etag>`
 
 ---
 
