@@ -105,7 +105,7 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 
 ---
 
-### 2. **GET `/api/plans*`*
+### 3. **GET `/api/plans*`**
 - **Description:** Retrieves all stored plans.
 
 - **Response:**
@@ -114,7 +114,7 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 
 ---
 
-### 3. **PATCH `/api/plans/{objectId}`**
+### 4. **PATCH `/api/plans/{objectId}`**
 - **Description:** Applies a **JSON Merge Patch (RFC 7386)** to update a plan.
 
 - **Conditional Write:**
@@ -129,7 +129,7 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 
 ---
 
-### 4. **DELETE `/api/plans/{objectId}`**
+### 5. **DELETE `/api/plans/{objectId}`**
 - **Description:** Delete the plan by `objectId`.
 - **Response:**
     - `204 No Content` if the object was deleted successfully.
