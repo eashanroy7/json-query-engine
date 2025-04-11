@@ -1,50 +1,57 @@
 package com.bigdata.json.query.service;
 
+import com.bigdata.json.query.config.RabbitConfig;
+import com.bigdata.json.query.messaging.PlanIndexMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
-import java.util.Iterator;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class PlanService {
 
     private final RedisTemplate<String, String> redisTemplate;
-    private final HashOperations<String, String, String> hashOperations;
-    private final ObjectMapper objectMapper;
+    private final AmqpTemplate amqp;
 
+    private HashOperations<String, String, String> hashOps;
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    public PlanService(RedisTemplate<String, String> redisTemplate) {
+    /** constructor used by Lombok; we init hashOps here */
+    public PlanService(RedisTemplate<String, String> redisTemplate,
+                       AmqpTemplate amqp) {
         this.redisTemplate = redisTemplate;
-        this.hashOperations = redisTemplate.opsForHash();
-        this.objectMapper = new ObjectMapper();
+        this.amqp          = amqp;
+        this.hashOps       = redisTemplate.opsForHash();
     }
 
-    private String dataKey(String objectId) {
-        return "plan:data:" + objectId;
+    /* ─────────────────── helpers ─────────────────── */
+
+    private static final String DATA_PREFIX = "plan:data:";
+
+    private String dataKey(String id) {
+        return DATA_PREFIX + id;
     }
 
     /**
      * Saves the JSON string to Redis in a single hash
      */
     public void savePlan(String objectId, String json) {
-        hashOperations.put(dataKey(objectId), "json", json);
+        hashOps.put(dataKey(objectId), "json", json);
+        publish(PlanIndexMessage.Operation.CREATE, objectId, json);
     }
 
     /**
      * Retrieves the JSON string by objectId, or null if not found.
      */
     public String getPlan(String objectId) {
-        return hashOperations.get(dataKey(objectId), "json");
+        return hashOps.get(dataKey(objectId), "json");
     }
 
     /**
@@ -52,23 +59,21 @@ public class PlanService {
      */
     public void deletePlan(String objectId) {
         redisTemplate.delete(dataKey(objectId));
+        publish(PlanIndexMessage.Operation.DELETE, objectId, null);
     }
 
     /**
      * Returns all stored plans as a List of JSON Strings.
      */
     public List<String> getAllPlans() {
-        Set<String> keys = redisTemplate.keys("plan:data:*");
-        List<String> plans = new ArrayList<>();
-        if (keys != null) {
-            for (String key : keys) {
-                String json = hashOperations.get(key, "json");
-                if (json != null) {
-                    plans.add(json);
-                }
-            }
+        Set<String> keys = Optional.ofNullable(redisTemplate.keys(DATA_PREFIX + "*"))
+                .orElse(Collections.emptySet());
+        List<String> out = new ArrayList<>(keys.size());
+        for (String k : keys) {
+            String j = hashOps.get(k, "json");
+            if (j != null) out.add(j);
         }
-        return plans;
+        return out;
     }
 
     /**
@@ -77,25 +82,22 @@ public class PlanService {
      * that does not match any existing element, that new object is added to the array.
      * Returns the updated JSON.
      */
-    public String patchPlan(String objectId, String patchPayload) throws Exception {
-        String existingJson = getPlan(objectId);
-        if (existingJson == null) {
-            throw new Exception("Plan not found");
-        }
-        JsonNode existingNode = objectMapper.readTree(existingJson);
-        JsonNode patchNode = objectMapper.readTree(patchPayload);
+    public String patchPlan(String id, String patchPayload) throws Exception {
+        String current = getPlan(id);
+        if (current == null) throw new Exception("Plan not found");
 
-        // Ensure both nodes are objects before merging
-        if (existingNode instanceof ObjectNode && patchNode instanceof ObjectNode) {
-            merge((ObjectNode) existingNode, (ObjectNode) patchNode);
-        } else {
+        JsonNode target = mapper.readTree(current);
+        JsonNode patch  = mapper.readTree(patchPayload);
+
+        if (!(target instanceof ObjectNode) || !(patch instanceof ObjectNode))
             throw new Exception("Invalid JSON structure for merging");
-        }
 
-        String updatedJson = objectMapper.writeValueAsString(existingNode);
-        // Save the updated JSON
-        savePlan(objectId, updatedJson);
-        return updatedJson;
+        merge((ObjectNode) target, (ObjectNode) patch);
+
+        String merged = mapper.writeValueAsString(target);
+        savePlan(id, merged);                              // also publishes CREATE
+        publish(PlanIndexMessage.Operation.PATCH, id, merged);
+        return merged;
     }
 
     /**
@@ -169,5 +171,11 @@ public class PlanService {
      */
     public String generateEtag(String jsonPayload) {
         return DigestUtils.md5DigestAsHex(jsonPayload.getBytes());
+    }
+
+    private void publish(PlanIndexMessage.Operation op, String id, String json) {
+        amqp.convertAndSend(RabbitConfig.PLAN_EXCHANGE,
+                "plan." + op.name().toLowerCase(),
+                new PlanIndexMessage(id, json, op));
     }
 }
