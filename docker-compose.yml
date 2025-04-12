@@ -3,3 +3,10 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-management
     ports: [ "5672:5672", "15672:15672" ]
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.4
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://host.docker.internal:9200"]'  # ← talks to local ES
+    ports:
+      - "5601:5601"

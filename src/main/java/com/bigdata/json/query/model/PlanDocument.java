@@ -4,11 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.annotations.Routing;
+import org.springframework.data.elasticsearch.annotations.*;
 import org.springframework.data.elasticsearch.core.join.JoinField;
-import org.springframework.data.elasticsearch.annotations.JoinTypeRelations;
-import org.springframework.data.elasticsearch.annotations.JoinTypeRelation;
 
 import java.util.Map;
 
@@ -16,7 +13,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(indexName = "plans")
-@Routing("objectId")   // children will use the parent’s id as routing key
+@Routing("routing")
 public class PlanDocument {
 
     @Id
@@ -33,6 +30,10 @@ public class PlanDocument {
                     children = "linkedPlanService")
     )
     private JoinField<String> relation;
+
+    /** holds the routing key */
+    @Field(type = FieldType.Keyword)
+    private String routing;
 
     /** Entire JSON blob for flexible queries */
     private Map<String, Object> payload;
