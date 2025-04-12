@@ -32,20 +32,25 @@ public class PlanIndexListener {
     private void index(PlanIndexMessage msg) throws IOException {
         JsonNode root = mapper.readTree(msg.getJson());
 
-        PlanDocument parent = new PlanDocument(
-                msg.getObjectId(),
-                new JoinField<>("plan"),
+        PlanDocument parent = new PlanDocument();          // no‑args ctor
+        parent.setObjectId(msg.getObjectId());
+        parent.setRelation(new JoinField<>("plan"));
+        parent.setRouting(msg.getObjectId());              // routing = own id
+        parent.setPayload(
                 mapper.convertValue(root, new TypeReference<Map<String, Object>>() {})
         );
         repo.save(parent);
 
         for (JsonNode childNode : root.withArray("linkedPlanServices")) {
             String childId = childNode.get("objectId").asText();
-            PlanDocument child = new PlanDocument(
-                    childId,
-                    new JoinField<>("linkedPlanService", msg.getObjectId()),
+            PlanDocument child = new PlanDocument();
+            child.setObjectId(childId);
+            child.setRelation(new JoinField<>("linkedPlanService", msg.getObjectId()));
+            child.setRouting(msg.getObjectId());           // route to parent shard
+            child.setPayload(
                     mapper.convertValue(childNode, new TypeReference<Map<String, Object>>() {})
             );
+            child.setRouting(msg.getObjectId());   // route child to same shard as parent
             repo.save(child);
         }
     }
