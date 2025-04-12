@@ -45,14 +45,40 @@ public class PlanIndexListener {
 
         /* ---------- linkedPlanServices children ---------- */
         for (JsonNode lpsNode : root.withArray("linkedPlanServices")) {
+
             String lpsId = lpsNode.get("objectId").asText();
 
+            /* 2‑A  save the linkedPlanService child (parent = plan) */
             PlanDocument lpsChild = new PlanDocument();
             lpsChild.setObjectId(lpsId);
             lpsChild.setRelation(new JoinField<>("linkedPlanService", planId));
-            lpsChild.setRouting(planId);
+            lpsChild.setRouting(planId);                 // always route to the plan
             lpsChild.setPayload(asMap(lpsNode));
             repo.save(lpsChild);
+
+            /* 2‑B  grand‑child : planserviceCostShare */
+            JsonNode pscsNode = lpsNode.path("planserviceCostShares");
+            if (pscsNode.isObject()) {
+                String pscsId = pscsNode.get("objectId").asText();
+                PlanDocument pscsDoc = new PlanDocument();
+                pscsDoc.setObjectId(pscsId);
+                pscsDoc.setRelation(new JoinField<>("planserviceCostShare", lpsId));
+                pscsDoc.setRouting(planId);              // still route by top plan
+                pscsDoc.setPayload(asMap(pscsNode));
+                repo.save(pscsDoc);
+            }
+
+            /* 2‑C  grand‑child : linkedService */
+            JsonNode lsNode = lpsNode.path("linkedService");
+            if (lsNode.isObject()) {
+                String lsId = lsNode.get("objectId").asText();
+                PlanDocument lsDoc = new PlanDocument();
+                lsDoc.setObjectId(lsId);
+                lsDoc.setRelation(new JoinField<>("linkedService", lpsId));
+                lsDoc.setRouting(planId);
+                lsDoc.setPayload(asMap(lsNode));
+                repo.save(lsDoc);
+            }
         }
 
         /* ---------- planCostShare child ---------- */
