@@ -29,29 +29,47 @@ public class PlanIndexListener {
         }
     }
 
+    /* ───────── index / re‑index ───────── */
+
     private void index(PlanIndexMessage msg) throws IOException {
         JsonNode root = mapper.readTree(msg.getJson());
+        String planId = msg.getObjectId();
 
-        PlanDocument parent = new PlanDocument();          // no‑args ctor
-        parent.setObjectId(msg.getObjectId());
+        /* ---------- parent ---------- */
+        PlanDocument parent = new PlanDocument();
+        parent.setObjectId(planId);
         parent.setRelation(new JoinField<>("plan"));
-        parent.setRouting(msg.getObjectId());              // routing = own id
-        parent.setPayload(
-                mapper.convertValue(root, new TypeReference<Map<String, Object>>() {})
-        );
+        parent.setRouting(planId);
+        parent.setPayload(asMap(root));
         repo.save(parent);
 
-        for (JsonNode childNode : root.withArray("linkedPlanServices")) {
-            String childId = childNode.get("objectId").asText();
-            PlanDocument child = new PlanDocument();
-            child.setObjectId(childId);
-            child.setRelation(new JoinField<>("linkedPlanService", msg.getObjectId()));
-            child.setRouting(msg.getObjectId());           // route to parent shard
-            child.setPayload(
-                    mapper.convertValue(childNode, new TypeReference<Map<String, Object>>() {})
-            );
-            child.setRouting(msg.getObjectId());   // route child to same shard as parent
-            repo.save(child);
+        /* ---------- linkedPlanServices children ---------- */
+        for (JsonNode lpsNode : root.withArray("linkedPlanServices")) {
+            String lpsId = lpsNode.get("objectId").asText();
+
+            PlanDocument lpsChild = new PlanDocument();
+            lpsChild.setObjectId(lpsId);
+            lpsChild.setRelation(new JoinField<>("linkedPlanService", planId));
+            lpsChild.setRouting(planId);
+            lpsChild.setPayload(asMap(lpsNode));
+            repo.save(lpsChild);
         }
+
+        /* ---------- planCostShare child ---------- */
+        JsonNode pcsNode = root.path("planCostShares");
+        if (pcsNode.isObject()) {
+            String pcsId = pcsNode.get("objectId").asText();   // or planId + "-pcs"
+            PlanDocument pcsChild = new PlanDocument();
+            pcsChild.setObjectId(pcsId);
+            pcsChild.setRelation(new JoinField<>("planCostShare", planId));
+            pcsChild.setRouting(planId);
+            pcsChild.setPayload(asMap(pcsNode));
+            repo.save(pcsChild);
+        }
+    }
+
+    /* helper: JsonNode -> Map<String,Object> */
+    private Map<String, Object> asMap(JsonNode node) {
+        return mapper.convertValue(node, new TypeReference<Map<String, Object>>() {});
     }
 }
