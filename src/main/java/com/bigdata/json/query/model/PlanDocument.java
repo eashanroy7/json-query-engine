@@ -26,10 +26,13 @@ public class PlanDocument {
      */
     @JoinTypeRelations(
             relations = {
-                    @JoinTypeRelation(parent = "plan", children = {
-                            "linkedPlanService",
-                            "planCostShare"
-                    })
+                    /* level‑1  : plan → linkedPlanService + planCostShare */
+                    @JoinTypeRelation(parent = "plan",
+                            children = { "linkedPlanService", "planCostShare" }),
+
+                    /* level‑2  : linkedPlanService → planserviceCostShare + linkedService */
+                    @JoinTypeRelation(parent = "linkedPlanService",
+                            children = { "planserviceCostShare", "linkedService" })
             }
     )
     private JoinField<String> relation;
