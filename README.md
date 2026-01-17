@@ -1,11 +1,37 @@
 # **JSON Query Engine**
 
-A REST API built with **Spring Boot** and **Redis** to handle structured JSON data. The application supports **CRUD operations**, **JSON Schema validation**, **ETag-based conditional read/writes**, **JSON Merge Patch for partial updates**, and security via **Google OAuth 2.0** with RS256.
+A production-grade, distributed RESTful API built with **Spring Boot** demonstrating advanced backend engineering through intelligent JSON document management. The application implements a **multi-store architecture** with **Redis** for transactional storage, **Elasticsearch** for hierarchical indexing and full-text search, and **RabbitMQ** for asynchronous message-driven synchronization. Features include **CRUD operations with optimistic concurrency control**, **JSON Schema validation**, **ETag-based conditional reads/writes**, **RFC 7386-compliant JSON Merge Patch**, and **Google OAuth 2.0 with RS256 JWT** security.
+
+---
+
+## **About**
+
+A production-grade RESTful API built with Spring Boot demonstrating advanced backend engineering through intelligent JSON document management. Implements ETag-based optimistic concurrency control, RFC 7386-compliant JSON Merge Patch for partial updates, and Google OAuth 2.0 with RS256 JWT validation for security. Features a distributed architecture with Redis for high-performance transactional storage, Elasticsearch with parent-child join relations for hierarchical document indexing and full-text search, and RabbitMQ for asynchronous message-driven indexing between data stores. Showcases expertise in RESTful API design, distributed systems patterns, event-driven architectures, and scalable multi-store persistence—core competencies for backend roles at top-tier companies.
+
+---
+
+## **Architecture Overview**
+
+This application demonstrates a **distributed, event-driven architecture** with multiple data stores:
+
+- **Redis**: Primary transactional data store for high-performance key-value operations
+- **Elasticsearch**: Secondary store with parent-child join relations for hierarchical document indexing and full-text search capabilities
+- **RabbitMQ**: Message broker enabling asynchronous, decoupled synchronization between Redis and Elasticsearch
+- **Event-Driven Design**: All write operations (CREATE, UPDATE, DELETE) publish messages to RabbitMQ, which are consumed by listeners that update Elasticsearch indices asynchronously
+
+```
+Client Request → REST Controller → Redis (Primary Store)
+                                  ↓
+                            RabbitMQ Message Queue
+                                  ↓
+                         Message Listener → Elasticsearch (Search Index)
+```
 
 ---
 
 ## **Features**
-- **CRUD Operations**:
+
+### **1. CRUD Operations with Optimistic Concurrency Control**
     - **Create (POST /api/plans):**  
       Creates a new plan resource.
       - If a plan with the same `objectId` does not exist, it creates the resource (returns **201 Created**).
@@ -24,23 +50,39 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
       - If the PATCH payload makes no effective change (ETag remains the same), returns **304 Not Modified**.
 
     - **Delete (DELETE /api/plans/{objectId}):**  
-      - Deletes a plan resource by its `objectId`.
+      - Deletes a plan resource by its `objectId` and publishes a delete event to RabbitMQ for Elasticsearch cleanup.
 
-- **Validation:**
-    - All incoming JSON payloads are validated against a pre-defined JSON Schema (`plan-schema.json`).
+### **2. JSON Schema Validation**
+- All incoming JSON payloads are validated against a pre-defined JSON Schema (`plan-schema.json`) using the NetworkNT JSON Schema Validator.
+- Ensures data integrity and contract compliance before persistence.
 
-- **ETag Support:**
-    - ETags are computed on the fly (using an MD5 hash of the JSON content) to support conditional reads and writes.
-    - GET requests use `If-None-Match` for caching (returning 304 Not Modified if the ETag matches).
-    - PATCH requests require an `If-Match` header (returning 412 Precondition Failed if it does not match).
+### **3. ETag-Based Optimistic Concurrency Control**
+- ETags are computed dynamically using MD5 hashing of JSON content to support conditional reads and writes.
+- **Conditional Reads**: GET requests use `If-None-Match` header for efficient caching (returning 304 Not Modified if ETag matches).
+- **Conditional Writes**: PATCH requests require an `If-Match` header to prevent lost updates (returning 412 Precondition Failed if ETag doesn't match).
+- Prevents race conditions and ensures data consistency in distributed systems.
 
-- **Data Storage:**
-    - Uses Redis as a key-value store.
-    - Each plan is stored as a Redis hash with the key pattern `plan:data:{objectId}` and a single field `"json"` containing the plan’s JSON.
+### **4. RFC 7386-Compliant JSON Merge Patch**
+- Implements **JSON Merge Patch (RFC 7386)** for partial updates with intelligent array merging.
+- Supports nested object merging and array element matching by `objectId`.
+- If a patch element with a new `objectId` is provided, it's automatically appended to the array.
 
-- **Security (Google OAuth 2.0):**
-    - All endpoints are secured using Bearer tokens issued by Google.
-    - The API uses Spring Security’s OAuth2 Resource Server to validate JWT tokens (signed with RS256).
+### **5. Multi-Store Architecture**
+- **Redis**: Serves as the source of truth for transactional consistency and low-latency reads/writes.
+- **Elasticsearch**: Provides advanced search capabilities with parent-child join relations for hierarchical document structure:
+  - `plan` → `linkedPlanService`, `planCostShare` (level 1)
+  - `linkedPlanService` → `planserviceCostShare`, `linkedService` (level 2)
+- **RabbitMQ**: Decouples write operations from indexing, enabling asynchronous Elasticsearch updates.
+
+### **6. Event-Driven Indexing**
+- All write operations (CREATE, PATCH, DELETE) publish messages to RabbitMQ topic exchange.
+- `PlanIndexListener` consumes messages and updates Elasticsearch indices asynchronously.
+- Routing keys enable flexible message handling (`plan.create`, `plan.patch`, `plan.delete`).
+
+### **7. Security (Google OAuth 2.0)**
+- All endpoints are secured using Bearer tokens issued by Google Identity Platform.
+- Spring Security's OAuth2 Resource Server validates JWT tokens signed with RS256.
+- JWK Set URI auto-rotation ensures cryptographic key freshness.
 
 ---
 
@@ -141,21 +183,37 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 
 ### **Prerequisites**
 - Java 17+
-- Maven
-- Redis (either installed locally or running in Docker)
+- Maven 3.6+
+- Redis 6+ (either installed locally or running in Docker)
+- Elasticsearch 8.x (running locally or in Docker)
+- RabbitMQ 3.x (running locally or in Docker)
 - Google Cloud Account for OAuth 2.0 credentials
 
 ### **Running the Application**
 
-1. **Start Redis**:
-   Locally:
-      ```bash
-      redis-server
-      ```
-   Docker:
-      ```bash
-      docker run --name redis -p 6379:6379 -d redis
-      ```
+1. **Start Infrastructure Services**:
+   
+   Using Docker Compose (recommended):
+   ```bash
+   docker-compose up -d
+   ```
+   
+   Or manually:
+   
+   **Redis:**
+   ```bash
+   docker run --name redis -p 6379:6379 -d redis
+   ```
+   
+   **Elasticsearch:**
+   ```bash
+   docker run --name elasticsearch -p 9200:9200 -e "discovery.type=single-node" -e "xpack.security.enabled=false" -d elasticsearch:8.17.4
+   ```
+   
+   **RabbitMQ:**
+   ```bash
+   docker run --name rabbitmq -p 5672:5672 -p 15672:15672 -d rabbitmq:3-management
+   ```
 
 2. **Clone the repository**:
    ```bash
@@ -166,25 +224,35 @@ A REST API built with **Spring Boot** and **Redis** to handle structured JSON da
 3. **Build and run the application**:
    ```bash
    ./mvnw spring-boot:run
-   /* The API will start on port 8081 */
+   # The API will start on port 8081
    ```
 
 4. **Configure Google OAuth 2.0**:
-    - Create OAuth 2.0 credentials in Google Cloud.
-    - Configure your OAuth Client (for example, use https://oauth.pstmn.io/v1/callback for Postman).
+    - Create OAuth 2.0 credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+    - Configure your OAuth Client (for Postman testing, use `https://oauth.pstmn.io/v1/callback` as the redirect URI).
     - Use the Client ID and Client Secret to obtain a Bearer token.
-    - Ensure your API’s security configuration is set to validate Google’s JWT tokens.
+    - The API's security configuration validates Google's JWT tokens automatically.
 
 ## **Configuration**
 
-Edit the following properties in `src/main/resources/application.properties` if needed:
+Edit the following properties in `src/main/resources/application.properties`:
 
 ```properties
+# Server
 server.port=8081
-spring.redis.host=localhost
-spring.redis.port=6379
 
-# OAuth2 Resource Server configuration
+# Redis (Primary Store)
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+
+# Elasticsearch (Search Index)
+spring.elasticsearch.uris=http://localhost:9200
+
+# RabbitMQ (Message Broker)
+spring.rabbitmq.host=localhost
+spring.rabbitmq.port=5672
+
+# OAuth2 Resource Server (Google IDP)
 spring.security.oauth2.resourceserver.jwt.issuer-uri=https://accounts.google.com
 spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://www.googleapis.com/oauth2/v3/certs
 ```
@@ -225,22 +293,91 @@ Finally, each request can inherit the OAuth 2.0 configuration from the parent co
 ## **Troubleshooting**
 
 1. **Port already in use**:  
-   Update the port in `application.properties` or free the port.
+   Update the port in `application.properties` or free the port using:
+   ```bash
+   # Windows
+   netstat -ano | findstr :8081
+   taskkill /PID <PID> /F
+   
+   # Linux/Mac
+   lsof -ti:8081 | xargs kill -9
+   ```
 
 2. **Redis connection errors**:  
-   Ensure Redis is running and accessible at `localhost:6379`.
-3. **OAuth 2.0 Errors**:
-   Verify that the Bearer token is valid and that the security configuration is correctly set up.
+   Ensure Redis is running and accessible at `localhost:6379`:
+   ```bash
+   redis-cli ping  # Should return "PONG"
+   ```
+
+3. **Elasticsearch connection errors**:  
+   Verify Elasticsearch is running:
+   ```bash
+   curl http://localhost:9200  # Should return cluster info
+   ```
+
+4. **RabbitMQ connection errors**:  
+   Check RabbitMQ status and management console at `http://localhost:15672` (default credentials: guest/guest).
+
+5. **OAuth 2.0 Errors**:
+   - Verify that the Bearer token is valid and not expired.
+   - Ensure the token is issued by Google (`iss: https://accounts.google.com`).
+   - Check that the security configuration matches the issuer URI.
 
 ---
 
 ## **Technologies Used**
 
-- **Spring Boot** (REST API framework)
-- **Redis** (Key-value store)
-- **JSON Schema Validator (NetworkNT)** (for payload validation)
-- **Spring Security: OAuth2 Resource Server (with Google IDP using RS256)**
-- **Maven** (Build tool)
+### **Backend Framework**
+- **Spring Boot 3.4.2** (Java 17)
+- **Spring Web** (REST API)
+- **Spring Security** (OAuth2 Resource Server)
+
+### **Data Stores**
+- **Redis** (Primary transactional key-value store)
+- **Elasticsearch 8.17.4** (Search index with parent-child join relations)
+
+### **Messaging**
+- **RabbitMQ** (AMQP message broker)
+- **Spring AMQP** (Message publishing and consumption)
+
+### **Security**
+- **Google OAuth 2.0** (Identity Provider)
+- **JWT with RS256** (Token validation)
+
+### **Data Validation & Processing**
+- **JSON Schema Validator (NetworkNT)** (Payload validation)
+- **Jackson** (JSON serialization/deserialization)
+- **JSON Merge Patch (RFC 7386)** (Partial updates)
+
+### **Build & Tooling**
+- **Maven** (Dependency management and build tool)
+- **Lombok** (Boilerplate reduction)
+- **Docker** (Containerization)
+
+---
+
+## **Key Technical Highlights**
+
+This project demonstrates several production-ready backend engineering patterns:
+
+1. **Polyglot Persistence**: Strategic use of multiple specialized data stores (Redis for speed, Elasticsearch for search) rather than forcing a single database to handle all use cases.
+
+2. **Event-Driven Architecture**: Decoupled write and indexing operations using message queues, enabling horizontal scalability and fault tolerance.
+
+3. **Optimistic Concurrency Control**: ETag-based conditional requests prevent lost updates and race conditions without pessimistic locking overhead.
+
+4. **REST API Best Practices**: 
+   - Proper HTTP semantics (201 Created, 304 Not Modified, 412 Precondition Failed)
+   - RFC-compliant implementations (RFC 7386 for JSON Merge Patch)
+   - Conditional requests (If-Match, If-None-Match headers)
+
+5. **Parent-Child Document Relationships**: Elasticsearch join relations enable efficient querying of hierarchical data while maintaining denormalization benefits.
+
+6. **Asynchronous Processing**: Non-blocking indexing operations improve API response times and user experience.
+
+7. **Security**: Industry-standard OAuth 2.0 with JWT validation, ensuring stateless authentication scalability.
+
+8. **Contract-First Design**: JSON Schema validation ensures API contracts are enforced at runtime.
 
 ---
 
