@@ -1,12 +1,8 @@
 # **JSON Query Engine**
 
-A production-grade, distributed RESTful API built with **Spring Boot** demonstrating advanced backend engineering through intelligent JSON document management. The application implements a **multi-store architecture** with **Redis** for transactional storage, **Elasticsearch** for hierarchical indexing and full-text search, and **RabbitMQ** for asynchronous message-driven synchronization. Features include **CRUD operations with optimistic concurrency control**, **JSON Schema validation**, **ETag-based conditional reads/writes**, **RFC 7386-compliant JSON Merge Patch**, and **Google OAuth 2.0 with RS256 JWT** security.
-
----
-
 ## **About**
 
-A production-grade RESTful API built with Spring Boot demonstrating advanced backend engineering through intelligent JSON document management. Implements ETag-based optimistic concurrency control, RFC 7386-compliant JSON Merge Patch for partial updates, and Google OAuth 2.0 with RS256 JWT validation for security. Features a distributed architecture with Redis for high-performance transactional storage, Elasticsearch with parent-child join relations for hierarchical document indexing and full-text search, and RabbitMQ for asynchronous message-driven indexing between data stores. Showcases expertise in RESTful API design, distributed systems patterns, event-driven architectures, and scalable multi-store persistence—core competencies for backend roles at top-tier companies.
+A production-grade RESTful API built with Spring Boot demonstrating advanced backend engineering through intelligent JSON document management. Implements ETag-based optimistic concurrency control, RFC 7386-compliant JSON Merge Patch for partial updates, and Google OAuth 2.0 with RS256 JWT validation for security. Features a distributed architecture with Redis for high-performance transactional storage, Elasticsearch with parent-child join relations for hierarchical document indexing and full-text search, and RabbitMQ for asynchronous message-driven indexing between data stores.
 
 ---
 
